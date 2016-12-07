@@ -3,11 +3,13 @@
 % addpath('/Users/markrichardson/Documents/Projects/Motivation')
 clear
 clc
-info = motiv_getpreprocinfo;  
+info = motiv_prepinfo('RH021016');
+info = motiv_getblockinfo(info);
+
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 datastruct.PtId = info.patientdir(max(strfind(info.patientdir,'/'))+1:end);
 datastruct.info = info;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 [datastruct] = motiv_getblockdata(datastruct); % block=3; ID=[]; 
 
 %%
