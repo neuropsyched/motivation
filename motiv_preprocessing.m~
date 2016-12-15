@@ -23,9 +23,7 @@ info.ns5 = info.TrellisFilenames(~cellfun(@isempty,strfind(info.TrellisFilenames
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 [datastruct] = motiv_getfiledata(info); % block=3; ID=[]; 
 
-save('datastruct.mat','datastruct','-v7.3')
 %% define the bad channels
-load('datastruct.mat','datastruct','-v7.3')
 datastruct.nfs = 1200;
 ch = datastruct.ChannelIDs;
 for f = 1:length(datastruct.FileNames)
@@ -59,7 +57,6 @@ for f = 1:length(datastruct.FileNames)
     cd([datastruct.info.patientdir '/NeurOmega/' sides{f}])
     mat_files = dir('*.mat');
     [Rec] = ReadNeuroOmega_AA(input, output, mat_files);
-    Rec = Rec(end:-1:1);
     datastruct.Rec{f} = Rec;
     clear Rec mat_files
 end
@@ -115,37 +112,23 @@ for f = 1:length(datastruct.FileNames);
 end
 save('datastruct2.mat','datastruct','-v7.3')
 %% Align ECOG and NO 
-% load('datastruct2.mat')
 nfs = datastruct.nfs;
-fs = 1000;
-ask = 1;
 for f = 1:length(datastruct.Rec)
-    Rec = datastruct.Rec{f}; %Previously flipped to decreasing depths to match file order
+    Rec = datastruct.Rec{f};
     filt = datastruct.filtdata{f};
-    force = datastruct.forcedata{f};
     %
     fileName = fullfile(datastruct.info.trellispath,char(datastruct.info.nev{f}));
     [EventTimesTrellis] = GetEventData(fileName); % trellis time stamps     
     
-    switch ask
-        case 1
-        h = figure; plot(EventTimesTrellis*[1 1],ylim)
-        disp(['Displaying EventTimes for datfile' datastruct.FileNames{f}])
-        title(['datfile' num2str(datastruct.FileNames{f})])
-        waitfor(h) % pause while figure is open
-
-        disp('Choose start and stop times')
-        % visually identify T0 / T1 in Trellis as the start / end of segment of interest
-        T0 = str2double(strsplit(cell2mat(inputdlg('Enter start times (space delimited)')),' '));
-        
-        case 0
-            switch f
-                case 1
-                   T0 = [1700,2300,2700,3620];
-                case 2
-                    T0 = [280,740,1530];
-            end
-    end
+    h = figure; plot(EventTimesTrellis*[1 1],ylim)
+    disp(['Displaying EventTimes for datfile' datastruct.FileNames{f}])
+    title(['datfile' num2str(datastruct.FileNames{f})])
+    waitfor(h) % pause while figure is open
+    
+    disp('Choose start and stop times')
+    % visually identify T0 / T1 in Trellis as the start / end of segment of interest
+    T0 = str2double(strsplit(cell2mat(inputdlg('Enter start times (space delimited)')),' '));
+    T0 = T0(end:-1:1); %Reverse order to match Rec
 
     for idx=1:length(Rec)
         EventTimesNO{idx} = sort([Rec(idx).DigUp Rec(idx).DigDown])';  % NO event times
@@ -157,64 +140,56 @@ for f = 1:length(datastruct.Rec)
         try
             tend(idx) = tstart(idx) + length(Rec(idx).Raw.ts)/Rec(idx).Raw.sr; % 5 secs after last time stamp
             E{idx} = filt(round(tstart(idx)*nfs):round(tend(idx)*nfs),:);
-            F{idx} = force(round(tstart(idx)*fs):round(tend(idx)*fs),:);
         catch
             tend(idx) = tstart(idx) + EventTimesNO{idx}(end)+10; % 5 secs after last time stamp
             E{idx} = filt(round(tstart(idx)*nfs):round(tend(idx)*nfs),:);
-            F{idx} = force(round(tstart(idx)*fs):round(tend(idx)*fs),:);
         end
     end
     datastruct.EventTimesTrellis{f} = EventTimesTrellis;
     datastruct.EventTimesNO{f} = EventTimesNO;
     datastruct.E{f} = E;
-    datastruct.F{f} = F;
-    clear EventTimesTrellis EventTimesNO E F 
+    clear EventTimesTrellis EventTimesNO E
 end
-clear ask f filt force idx tend tstart T0 Event0 Rec
-% save('datastruct3.mat','datastruct','-v7.3')
+
+save('datastruct3.mat','datastruct','-v7.3')
 % filtered_data = datastruct.E;
 % save('filtered_data_aligned.mat','filtered_data')
 
 %% Align responses
-% load('/home/ari/Documents/Projects/Motivation/RH021016/datastruct3.mat');
+trialskips=1;
+skips=7;
 info = datastruct.info;
-fs=1000;
-nfs = datastruct.nfs;
-[subdir,~] = dirdir(info.patientdir);
-subdir = subdir(~cellfun(@isempty,strfind(lower(subdir),'matlab')));
-info.MTdir = char(fullfile(info.patientdir,subdir));
-
-if ~exist(info.MTdir,'dir')
-    error(['Nonexistent Directory: Tried to access: ' info.MTdir])
+try 
+    [subdir,~] = dirdir(info.patientdir);
+    subdir = subdir(~cellfun(@isempty,strfind(lower(subdir),'matlab')));
+    cd(char(fullfile(info.patientdir,subdir)))
+catch
 end
+info.MTdir = char(fullfile(info.patientdir,subdir));
 [~,files] = dirdir(info.MTdir);
 files = files(~cellfun(@isempty,strfind(files,'intraop')));
 files = files(~cellfun(@isempty,strfind(files,'.txt')));
+
 for f=1:length(datastruct.FileNames);
-    MT_files = files(listdlg('PromptString',['Choose Text Files for: ' datastruct.FileNames{f}],...
-        'SelectionMode','multiple','ListSize',[450 300],'ListString',files));
-    info.MT_files{f} = MT_files;
+MT_files = files(listdlg('PromptString',['Choose Text Files for: ' datastruct.FileNames{f}],...
+    'SelectionMode','multiple','ListSize',[450 300],'ListString',files));
+info.MT_files{f} = MT_files;
 end
 
-f=1; %length(datastruct.FileNames) %file
-t=1; %length(info.MT_files{f}) %num_task
-celldata = motiv_readintraoptxtfiles(fullfile(info.MTdir,info.MT_files{f}(t))); 
-
-% isempty(find(cellfun(@isempty,find(celldata(:,7),'ABORT'))==1))
-% try
-%     celldata=BilateralDelayMotivationTaskIntraop;
-% end
-trialskips = 1; %no baseline for the first trial
+try
+    celldata=BilateralDelayMotivationTaskIntraop;
+    task=1;
+catch
+    celldata=BilateralDelayGripTaskIntraop;
+    task=2;
+end
 celldata(trialskips,:)=[];
 %Indexing event times
 %Get BilateralDelayMotivationTaskIntraopData using import from txt
-skips = 7;
-EventTimes=datastruct.EventTimesNO{f}{t}; % figure; plot(EventTimes*[1 1],ylim)
 [CueStimulusTimes, CueStimulusDuration, ~, ~] = MotivationTaskStimulusBlock(EventTimes, skips, 4, 1, celldata);
 [CommandStimulusTimes,~, CommandTrial, ~] = MotivationTaskStimulusBlock(EventTimes, skips, 4, 2, celldata);
 [FeedbackStimulusTimes, ~, ~, ~] = MotivationTaskStimulusBlock(EventTimes, skips, 4, 3, celldata);
 [ITIStimulusTimes, ITIStimulusDuration, ~, ~] = MotivationTaskStimulusBlock(EventTimes, skips, 4, 4, celldata);
-task=1;
 switch task
     case 1
         RGC=intersect(CommandTrial.Correct,intersect(CommandTrial.Right,CommandTrial.Go));
@@ -253,59 +228,3 @@ end
 LGC=LGC(LGCR>0);
 LGCR=LGCR(LGCR>0)./fs;
 
-%% spectral measures
-amp=abs(hilbert(eegfilt(filt',fs,70,200)'));
-ampC=abs(hilbert(eegfilt(CAR',fs,70,200)'));
-ampB=abs(hilbert(eegfilt(refbi',fs,80,150)'));
-
-%%  Trial processing
-f=1;
-t=1;
-filtered = datastruct.E{f}{t};
-for e=1:length(LGC)
-    % TrialtypeL(e)=sum(ismember(CommandTrial.Win,LGC(e)))+2*sum(ismember(CommandTrial.Lose,LGC(e)))+3*sum(ismember(CommandTrial.Squeeze,LGC(e)));
-    EEG.event(1).type='Cue';
-    EEG.event(1).latency=fs*(CueStimulusTimes(LGC(e))-ITIStimulusTimes(LGC(e)-1));
-    EEG.event(2).type='Command';
-    EEG.event(2).latency=fs*(CommandStimulusTimes(LGC(e))-ITIStimulusTimes(LGC(e)-1));
-    EEG.event(3).type='Squeeze';
-    EEG.event(3).latency=fs*(LGCR(e)-ITIStimulusTimes(LGC(e)-1));
-    EEG.event(4).type='Feedback';
-    EEG.event(4).latency=fs*(FeedbackStimulusTimes(LGC(e))-ITIStimulusTimes(LGC(e)-1));
-    ELeft{e}=EEG;
-end
-[trialsL,CTIL]=check_trials(filtered,ITIStimulusTimes(LGC-1),ITIStimulusTimes(LGC),ELeft,fs);
-
-for e=1:length(RGC)
-    TrialtypeR(e)=sum(ismember(CommandTrial.Win,RGC(e)))+2*sum(ismember(CommandTrial.Lose,RGC(e)))+3*sum(ismember(CommandTrial.Squeeze,RGC(e)));
-    EEG.event(1).type='Cue';
-    EEG.event(1).latency=fs*(CueStimulusTimes(RGC(e))-ITIStimulusTimes(RGC(e)-1));
-    EEG.event(2).type='Command';
-    EEG.event(2).latency=fs*(CommandStimulusTimes(RGC(e))-ITIStimulusTimes(RGC(e)-1));
-    EEG.event(3).type='Squeeze';
-    EEG.event(3).latency=fs*(RGCR(e)-ITIStimulusTimes(RGC(e)-1));
-    EEG.event(4).type='Feedback';
-    EEG.event(4).latency=fs*(FeedbackStimulusTimes(RGC(e))-ITIStimulusTimes(RGC(e)-1));
-    [pk loc]=max(Force(round(RGCR(e)*fs):round(RGCR(e)*fs+fs),2));
-    acc=(pk-Force(round(RGCR(e)*fs),2))/((loc-1)/fs);
-    rxt=RGCR(e)-CommandStimulusTimes(RGC(e));
-    movement(e,:)=[rxt pk acc];
-    ERight{e}=EEG;
-    
-end
-[trialsR,badRT]=check_trials(reshape(smooth(ampC,50),[],length(labels)),ITIStimulusTimes(RGC-1),ITIStimulusTimes(RGC),ERight,fs);
-
-rxn=mean(RGCR-CommandStimulusTimes(RGC)');
-for e=1:length(RNGC)
-    TrialtypeR(e)=sum(ismember(CommandTrial.Win,RNGC(e)))+2*sum(ismember(CommandTrial.Lose,RNGC(e)))+3*sum(ismember(CommandTrial.Squeeze,RNGC(e)));
-    EEG.event(1).type='Cue';
-    EEG.event(1).latency=fs*(CueStimulusTimes(RNGC(e))-ITIStimulusTimes(RNGC(e)-1));
-    EEG.event(2).type='Command';
-    EEG.event(2).latency=fs*(CommandStimulusTimes(RNGC(e))-ITIStimulusTimes(RNGC(e)-1));
-    EEG.event(3).type='Squeeze';
-    EEG.event(3).latency=fs*(EEG.event(2).latency/fs + rxn);
-    EEG.event(4).type='Feedback';
-    EEG.event(4).latency=fs*(FeedbackStimulusTimes(RNGC(e))-ITIStimulusTimes(RNGC(e)-1));
-    ERightNG{e}=EEG;
-end
-[trialsRNG,CTIRNG]=check_trials(filtered,ITIStimulusTimes(RNGC-1),ITIStimulusTimes(RNGC),ERightNG,fs);

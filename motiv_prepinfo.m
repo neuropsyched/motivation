@@ -16,13 +16,14 @@ function [info] = motiv_prepinfo(PtId)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 info.projroot = fileparts(which('motiv_prepinfo.m'));
-info.dataroot = '/home/richardsonlab/ari/Projects';
+info.dataroot = '~/Documents/Projects/Motivation';
 % cd(info.projroot);
 
 if nargin<1
     disp('Choose Patient Directory')
     [subs,~] = dirdir(info.dataroot);
-    info.patientname = subs{listdlg('PromptString','Choose Patient','SelectionMode','single','ListString',subs)};
+    info.patientname = subs{listdlg('PromptString','Choose Patient',...
+        'SelectionMode','single','ListSize',[450 300],'ListString',subs)};
 elseif nargin==1
     if ~ischar(PtId)
         error('Patient ID must be a string')
@@ -75,9 +76,10 @@ end
 clc
 save(fullfile(info.patientdir,'motiv_info.mat'),'info')
 elseif exist(fullfile(info.patientdir,'motiv_info.mat'),'file')
+    disp(['loading info file: ' fullfile(info.patientdir,'motiv_info.mat')])
     load(fullfile(info.patientdir,'motiv_info.mat'))
 end
-
+disp('** Process Done **')
 end
 
 % if ~cellfun(@isempty,strfind(foldernames,'Trellis'))

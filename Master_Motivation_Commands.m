@@ -1,11 +1,26 @@
 %% import LFP data
-[xlname,xlpath,~] = uigetfile({'*.xlsx'},'Select Labels Spreadsheet');
-A=importdata(fullfile(xlpath,xlname));
-[labels,ch]=xl_labels(A);
+% [xlname,xlpath,~] = uigetfile({'*.xlsx'},'Select Labels Spreadsheet');
+% A=importdata(fullfile(xlpath,xlname));
+% [labels,ch]=xl_labels(A);
+clear; clc
+info = motiv_prepinfo;
+[xlpath,xlname,xlext] = fileparts('/home/ari/Documents/Projects/ECoG Electrode Keys.xlsx');
+xlsheet = info.patientname(3:end);
+try
+[~, ~, Labels] = xlsread(fullfile(xlpath,[xlname,xlext]),xlsheet);
+Labels = Labels(4:129,2);
+Labels(cellfun(@(x) ~isempty(x) && isnumeric(x) && isnan(x),Labels)) = {''};
+catch
+end
+clear xl*
 IDs=[1:64,129:160,257:288];
-ch=IDs(97:97+63);
+ch=IDs(:);
 fs=1000;
-[~, raw, IDs] = GetAnalogData([Path FileName '.ns2'], fs, ch);
+info.nev = info.TrellisFilenames(~cellfun(@isempty,strfind(info.TrellisFilenames,'.nev')));
+info.ns2 = info.TrellisFilenames(~cellfun(@isempty,strfind(info.TrellisFilenames,'.ns2')));
+info.ns5 = info.TrellisFilenames(~cellfun(@isempty,strfind(info.TrellisFilenames,'.ns5')));
+
+% [~, raw, IDs] = GetAnalogData(ns2{1}, fs, ch,'','');
 
 %% data preprocessing
 raw=bsxfun(@minus,raw,mean(raw,1));
